@@ -1,0 +1,30 @@
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+.ipynb_checkpoints/
+
+# Training Logs & Outputs
+logs/
+*.out
+*.err
+
+# Model Weights & Checkpoints (too large for GitHub)
+checkpoints/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.gguf
+
+# Sensitive / Local Reference Files
+id_ed25519
+*.pem
+.git-credentials
+vscode_vm_git_guide.md
+
+# OS / Editor files
+.DS_Store
+.vscode/
