@@ -29,5 +29,5 @@ vscode_vm_git_guide.md
 .DS_Store
 .vscode/
 
-# Intermidiate result files
-iitkgp-capstone/notebooks/capstone_it_helpdesk/
+# Intermediate result files
+notebooks/capstone_it_helpdesk/
