@@ -1,8 +1,8 @@
 # Track A Remote VM: Team Member Daily Workflow Guide
 
-Welcome to the IIT KGP Capstone environment on `upgrad-l40s-vm03`. The primary user has already provisioned the Git repository, `uv`, Python **3.12.14**, and the `.venv` virtual environment containing all **19 pinned ML/Python packages**.
+Welcome to the IIT KGP Capstone environment on `upgrad-l40s-vm03`. The primary user has already provisioned the Git repository, `uv`, Python **3.12.14**, `jupyter`/`nbconvert`, and the `.venv` virtual environment containing all **19 pinned ML/Python packages**.
 
-This guide explains how **subsequent users / team members** connect to the VM via VS Code, edit `.ipynb` and `.py` files, run GPU training and inference jobs through **Slurm**, and collaborate cleanly using **Git & GitHub**.
+This guide explains how **subsequent users / team members** connect to the VM via VS Code, edit `.ipynb` and `.py` files, test the GPU, execute notebooks and training jobs through **Slurm (`sbatch`)**, and collaborate cleanly using **Git & GitHub**.
 
 ---
 
@@ -15,8 +15,9 @@ All team members share the `learner04` account on `upgrad-l40s-vm03`. Coordinate
 | **GPU Allowance** | **75 GPU-hours total** for the account (no automatic reset). Idle allocated GPU time is billed; queue wait time is not. |
 | **Job Concurrency** | Only **1 GPU job runs across the entire VM** at a time. Max **1 running + 1 pending** job for `learner04`. |
 | **Max Job Duration** | **5 hours** maximum per job, always requesting `--gres=gpu:1`. |
-| **Direct GPU Access** | **Blocked** in the SSH login shell. All model training, fine-tuning, and GPU inference **must** run via Slurm (`sbatch` or `srun`). |
+| **Direct GPU Access** | **Blocked** in the SSH login shell. All GPU tests, notebook executions, training, and inference **must** run via Slurm (`sbatch`). |
 | **Private Storage Quota** | **32 GiB soft / 35 GiB hard** limit. Check frequently with `quota -s`. |
+| **Notebook Folders** | Input `.ipynb` files live in `notebooks/`; executed `.ipynb` outputs go to `notebooks_output/`. |
 | **Access Expiration** | **`2 December 2026 at 17:27:52 IST`** — all jobs cancel and SSH expires at this time. Back up work beforehand. |
 
 > **Important:** Do **not** install Microsoft's **Remote - SSH** extension for this VM. SSH port forwarding is disabled on `upgrad-l40s-vm03`, so Remote-SSH will hang indefinitely. Always use **SSH FS** + **VS Code's Integrated Terminal**.
@@ -42,6 +43,7 @@ Get the `id_ed25519` private key file and passphrase from your primary user/coor
 
 ### Step 2: Add the SSH Alias (`~/.ssh/config`)
 Open `C:\Users\<YourUsername>\.ssh\config` (Windows) or `~/.ssh/config` (macOS/Linux) and add:
+
 ```text
 Host upgrad-l40s-vm03
     HostName 103.42.50.41
@@ -113,6 +115,7 @@ source .venv/bin/activate
 ```bash
 which python          # Should point to .../iitkgp-capstone/.venv/bin/python
 python --version      # Should print Python 3.12.14
+jupyter --version     # Confirms jupyter & nbconvert are available
 ```
 
 > **Note on Installing New Packages:** Do **not** blindly upgrade `torch`, `transformers`, `peft`, or `bitsandbytes` (they are pinned to match the 4 capstone notebooks). If you must add a lightweight utility package, coordinate with the team and install it with `uv`:
@@ -123,80 +126,149 @@ python --version      # Should print Python 3.12.14
 
 ---
 
-## 4. Coding in `.py` and `.ipynb` Files
+## 4. How to Test the GPU (Quick `sbatch` Health Check)
 
-### Editing Files Directly on the VM
-* Open any `.py`, `.sbatch`, `.jsonl`, or `.ipynb` file from the **Explorer** sidebar (`upgrad-l40s-vm03`).
-* When you press `Ctrl + S`, **SSH FS** saves your changes immediately to `/storage/tracka/users/learner04/project/...` on the VM.
+Direct GPU usage is blocked on the SSH login node (running `torch.cuda.is_available()` in the login shell will always return `False`). To verify that the GPU, NVIDIA driver, and PyTorch CUDA build are working properly, submit a quick 5-second Slurm job.
 
-### Important: Running `.ipynb` Notebooks on This VM
-Because `upgrad-l40s-vm03` has **no hosted Jupyter server**, **no SSH port forwarding**, and **blocks direct GPU usage in the login shell**, clicking the "Run Cell" button inside VS Code on an SSH FS-mounted notebook will **not** execute on the VM's GPU.
+1. **Create `test_gpu.sbatch`** inside `~/project/iitkgp-capstone` (if not already present):
+   ```bash
+   cd ~/project/iitkgp-capstone
+   mkdir -p logs
 
-Use one of these two workflows for notebooks:
-1. **Workflow A — Convert/Run Notebooks via Slurm (For GPU Execution):**
-   * Edit the `.ipynb` file (or extract your training/evaluation logic into a `.py` script like `train.py` or `infer.py`) using VS Code.
-   * Run the script inside a Slurm job using the `.venv` interpreter:
-     ```bash
-     # Inside your .sbatch script:
-     ~/project/iitkgp-capstone/.venv/bin/python train.py
-     ```
-   * If you want Slurm to execute an `.ipynb` file end-to-end (provided `nbconvert` or `papermill` is installed in `.venv`), you can run it inside an `.sbatch` script:
-     ```bash
-     ~/project/iitkgp-capstone/.venv/bin/jupyter nbconvert --to notebook --execute my_notebook.ipynb --output my_notebook_out.ipynb
-     ```
-2. **Workflow B — Lightweight CPU Inspection in the VM Terminal:**
-   * For quick syntax checks, dataset inspection, or `pytest` unit tests that do **not** touch the GPU:
-     ```bash
-     cd ~/project/iitkgp-capstone
-     source .venv/bin/activate
-     pytest
-     python train.py --help
-     ```
+   cat << 'EOF' > test_gpu.sbatch
+   #!/bin/bash
+   #SBATCH --job-name=test_gpu
+   #SBATCH --gres=gpu:1
+   #SBATCH --time=00:05:00
+   #SBATCH --output=logs/test_gpu-%j.out
+   #SBATCH --error=logs/test_gpu-%j.err
+
+   source /storage/tracka/users/learner04/project/iitkgp-capstone/.venv/bin/activate
+
+   echo "=== nvidia-smi ==="
+   nvidia-smi
+
+   echo "=== PyTorch CUDA Check ==="
+   python -c "
+   import torch
+   print('PyTorch:', torch.__version__)
+   print('CUDA available:', torch.cuda.is_available())
+   assert torch.cuda.is_available(), 'CUDA is not available!'
+   print('Device count:', torch.cuda.device_count())
+   print('Device name:', torch.cuda.get_device_name(0))
+   free, total = torch.cuda.mem_get_info(0)
+   print(f'VRAM: {free/2**30:.1f} GiB free / {total/2**30:.1f} GiB total')
+   x = torch.randn((1024, 1024), device='cuda')
+   print('Matrix multiply test OK:', (x @ x).mean().item())
+   "
+   EOF
+   ```
+2. **Submit and monitor:**
+   ```bash
+   sbatch test_gpu.sbatch
+   squeue --me
+   ```
+3. **Check the output** (replace `<JOB_ID>` with your job number):
+   ```bash
+   cat logs/test_gpu-<JOB_ID>.out
+   cat logs/test_gpu-<JOB_ID>.err
+   ```
+   A healthy GPU node prints `CUDA available: True`, the GPU model and free VRAM, and `Matrix multiply test OK`.
 
 ---
 
-## 5. Running & Monitoring GPU Jobs with Slurm
+## 5. Coding & Executing `.ipynb` Notebooks and `.py` Scripts
 
-All GPU training and inference must go through Slurm.
+### Folder Convention
+* **Input notebooks:** `~/project/iitkgp-capstone/notebooks/` (e.g., `notebooks/it_helpdesk_week1_baseline.ipynb`)
+* **Executed output notebooks:** `~/project/iitkgp-capstone/notebooks_output/` (e.g., `notebooks_output/it_helpdesk_week1_baseline.ipynb`)
+* **Slurm logs:** `~/project/iitkgp-capstone/logs/`
 
-### 1. Ensure Your `.sbatch` Script Uses the `uv` `.venv`
-Before submitting, check your `train.sbatch` file in VS Code. Make sure it:
-* Keeps `#SBATCH --gres=gpu:1`
-* Requests a realistic time limit (starter is 2 hours; hard maximum is 5 hours: `#SBATCH --time=02:00:00`)
-* Writes to a **new, job-specific output directory** so you don't overwrite a teammate's adapter
-* Activates your `uv` environment (`source ~/project/iitkgp-capstone/.venv/bin/activate`) instead of the default `~/venv` if your code relies on the 19 pinned packages.
+### Editing Files Directly on the VM
+* Open any `.ipynb`, `.py`, `.sbatch`, or `.jsonl` file from the VS Code **Explorer** sidebar (`upgrad-l40s-vm03`).
+* Pressing `Ctrl + S` saves your edits immediately to `/storage/tracka/users/learner04/project/...` on the VM via **SSH FS**.
 
-### 2. Submit & Monitor a Job
+### Running `.ipynb` Notebooks on the GPU via Slurm (`sbatch`)
+Because `upgrad-l40s-vm03` has **no hosted Jupyter server**, **no SSH port forwarding**, and **blocks direct GPU usage in the login shell**, always execute GPU notebooks via `sbatch` using `jupyter nbconvert`.
+
+1. **Create a Slurm script** (e.g., `run_week1.sbatch`) inside `~/project/iitkgp-capstone`:
+   ```bash
+   cat << 'EOF' > run_week1.sbatch
+   #!/bin/bash
+   #SBATCH --job-name=week1_baseline
+   #SBATCH --gres=gpu:1
+   #SBATCH --time=02:00:00
+   #SBATCH --output=logs/week1-%j.out
+   #SBATCH --error=logs/week1-%j.err
+
+   mkdir -p logs notebooks_output
+   source /storage/tracka/users/learner04/project/iitkgp-capstone/.venv/bin/activate
+
+   jupyter nbconvert --to notebook --execute \
+     --ExecutePreprocessor.timeout=-1 \
+     notebooks/it_helpdesk_week1_baseline.ipynb \
+     --output-dir notebooks_output \
+     --output it_helpdesk_week1_baseline.ipynb
+   EOF
+   ```
+   > **Key Flags Explained:**
+   > * `--ExecutePreprocessor.timeout=-1` prevents `nbconvert` from aborting long-running training or inference cells.
+   > * `--output-dir notebooks_output` and `--output <filename>.ipynb` write the executed notebook cleanly into `notebooks_output/` without overwriting your source file in `notebooks/`.
+
+2. **Submit the job and watch the logs:**
+   ```bash
+   mkdir -p logs notebooks_output
+   sbatch run_week1.sbatch
+   squeue --me
+   ```
+   Once the job state changes from `PD` (pending) to `R` (running), follow the live logs (replace `<JOB_ID>` with the number returned by `sbatch`):
+   ```bash
+   tail -f logs/week1-<JOB_ID>.out logs/week1-<JOB_ID>.err
+   ```
+
+3. **View the Executed Notebook:**
+   When the job finishes, open `notebooks_output/it_helpdesk_week1_baseline.ipynb` in VS Code via **SSH FS** to inspect all rendered tables, plots, and cell outputs.
+
+### Running `.py` Scripts & CPU Checks
+* **For GPU `.py` scripts (`train.py`, `infer.py`):** Run them inside an `.sbatch` script after activating `.venv`:
+  ```bash
+  source /storage/tracka/users/learner04/project/iitkgp-capstone/.venv/bin/activate
+  python train.py
+  ```
+* **For lightweight CPU-only checks (no GPU):** You can run `pytest`, `python train.py --help`, or dataset validation directly in the SSH terminal after running `source .venv/bin/activate`.
+
+---
+
+## 6. Monitoring & Managing Slurm Jobs
+
+### Common Slurm Commands
 ```bash
-cd ~/project/iitkgp-capstone   # (or ~/project for starter scripts)
-mkdir -p logs
-sbatch train.sbatch            # Returns: Submitted batch job <JOB_ID>
-squeue --me                    # PD = Pending (waiting for GPU), R = Running
-```
-* Do **not** resubmit a job just because its state is `PD` (only 1 GPU job runs at a time across all 5 learners).
-* Submitted jobs continue running safely even after you close VS Code or disconnect SSH.
+# Submit a batch job (note the returned JOB_ID)
+sbatch run_week1.sbatch
 
-### 3. Check Completed Jobs & Inspect Logs
-```bash
-# View final status & elapsed time for today's jobs (replace 'today' with YYYY-MM-DD if older)
+# Check your queued/running jobs (PD = Pending, R = Running)
+squeue --me
+
+# View final status & elapsed time for today's completed jobs (replace 'today' with YYYY-MM-DD if older)
 sacct -X --starttime today --format=JobID,JobName,State,Elapsed,AllocTRES
 
-# Inspect stdout, stderr, and training summary (replace 123 with your JOB_ID)
+# Read logs or training summaries (replace 123 with your JOB_ID)
 JOB_ID=123
-tail -n 40 "$HOME/project/logs/qlora-$JOB_ID.out"
-tail -n 40 "$HOME/project/logs/qlora-$JOB_ID.err"
+tail -n 40 logs/week1-$JOB_ID.out
+tail -n 40 logs/week1-$JOB_ID.err
 cat "$HOME/checkpoints/job-$JOB_ID/training_summary.json"
-```
 
-### 4. Cancel a Job (Save GPU-Hours!)
-If a job is stuck, misconfigured, or no longer needed, cancel it immediately so you don't burn the 75 GPU-hour allowance:
-```bash
+# Cancel a stuck or unneeded job immediately to save GPU-hours
 scancel "$JOB_ID"
 ```
 
+* Do **not** resubmit a job just because its state is `PD` (only 1 GPU job runs at a time across all 5 learners).
+* Submitted `sbatch` jobs continue running safely even after you close VS Code or disconnect SSH.
+* Always keep `#SBATCH --gres=gpu:1`, request a realistic `#SBATCH --time` (max `05:00:00`), and write model checkpoints to a **new, job-specific output directory**.
+
 ---
 
-## 6. Git & GitHub Collaboration Workflow
+## 7. Git & GitHub Collaboration Workflow
 
 Because all team members share `~/project/iitkgp-capstone` on the VM, follow this disciplined workflow to avoid overwriting each other's work:
 
@@ -216,7 +288,7 @@ git pull            # Sync latest changes from GitHub
 2. **Stage, commit, and push:**
    ```bash
    git add <file1> <file2>
-   git commit -m "Clear description of your change (e.g., Add LoRA rank 16 eval script)"
+   git commit -m "Clear description of your change (e.g., Update week1 baseline notebook)"
    git push
    ```
 3. **Working on a Feature Branch (Recommended for Parallel Edits):**
@@ -227,14 +299,14 @@ git pull            # Sync latest changes from GitHub
    ```
    Then open a Pull Request on GitHub (`https://github.com/soumen-chatterjee/iitkgp-capstone`) to merge cleanly into `main`.
 
-> **Tip:** If you commit from the shared VM, Git uses the global author configured on `learner04`. To attribute a specific commit to yourself without changing the global config, pass `--author`:
+> **Tip:** To attribute a commit to yourself on the shared `learner04` account without changing the global Git config, pass `--author`:
 > ```bash
 > git commit --author="Your Name <your-github-id+username@users.noreply.github.com>" -m "Your message"
 > ```
 
 ---
 
-## 7. Storage Cleanup & Backing Up Before Access Expires
+## 8. Storage Cleanup & Backing Up Before Access Expires
 
 ### Check & Manage Disk Quota
 ```bash
@@ -248,7 +320,7 @@ Run these commands in a **local terminal** (not inside the VM) regularly, and **
 
 * **Windows PowerShell:**
   ```powershell
-  # Backup project code
+  # Backup project code & notebooks_output
   scp -i "C:\Users\<YourUsername>\Downloads\TrackA_VM03_Group04\id_ed25519" `
     -P 1026 -r learner04@103.42.50.41:project `
     "$env:USERPROFILE\Downloads\TrackA_project_backup"
@@ -268,7 +340,7 @@ Run these commands in a **local terminal** (not inside the VM) regularly, and **
 
 ---
 
-## 8. Quick Troubleshooting Cheat Sheet
+## 9. Quick Troubleshooting Cheat Sheet
 
 ### A. VS Code SSH FS Troubleshooting
 
@@ -279,13 +351,14 @@ Run these commands in a **local terminal** (not inside the VM) regularly, and **
 | **VS Code terminal fails: `Starting directory (cwd) "\storage\..." does not exist`** | VS Code tried to open local PowerShell in a remote Linux path. Use the **SSH FS** `>_` terminal icon, or set `"terminal.integrated.cwd"` to your local home folder in `settings.json`. |
 | **Need detailed SSH FS logs** | Press `Ctrl + Shift + U` (**Output** panel) and choose **SSH FS** from the dropdown menu on the right. |
 
-### B. SSH, Python (`uv`), Slurm & Git Troubleshooting
+### B. SSH, Python (`uv`), Jupyter, Slurm & Git Troubleshooting
 
 | Symptom / Error | Cause & Fix |
 | :--- | :--- |
 | **`Load key ... Permission denied`** | Windows/macOS key permissions are too open. Re-run `icacls` (Windows) or `chmod 600` (macOS/Linux) from Section 2. |
 | **`uv: command not found`** | Load `uv` into your shell PATH: `source "$HOME/.local/bin/env"`. |
-| **`ModuleNotFoundError` when running Python** | You forgot to activate the `uv` environment. Run `source ~/project/iitkgp-capstone/.venv/bin/activate` (or call `.venv/bin/python` directly in `.sbatch`). |
-| **`CUDA not available` or GPU blocked in terminal** | Direct GPU access is blocked on the login node. Submit your script via `sbatch` or `srun --gres=gpu:1`. |
+| **`ModuleNotFoundError` when running Python or Jupyter** | You forgot to activate the `uv` environment. Run `source ~/project/iitkgp-capstone/.venv/bin/activate` (or include it in your `.sbatch` script). |
+| **`AssertionError: GPU required` or `CUDA not available`** | Direct GPU access is blocked on the login shell. Submit the notebook or script via `sbatch` with `#SBATCH --gres=gpu:1`, and verify GPU health using `sbatch test_gpu.sbatch` (Section 4). |
+| **`pattern '...' matched no files` in `nbconvert`** | Check your current working directory (`pwd`) and exact casing—input notebooks live in lowercase `notebooks/` inside `~/project/iitkgp-capstone`. |
 | **`GH007: Your push would publish a private email`** | Ensure `git config --global user.email` is set to a `@users.noreply.github.com` address, then run `git commit --amend --reset-author --no-edit` and `git push`. |
 | **`Disk quota exceeded`** | Run `quota -s` and delete old run folders inside `~/checkpoints/` or old logs inside `~/project/logs/`. |

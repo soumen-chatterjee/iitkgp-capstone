@@ -1,283 +1,370 @@
-# Track A Remote VM: VS Code, SSH & Git Setup Guide
+# Track A Remote VM: Primary User Initial Setup & Configuration Guide
 
-This guide provides the **most reliable workflow** for developing on the IIT KGP Capstone GPU VM (`upgrad-l40s-vm03`) from **Windows** using **Visual Studio Code**, **OpenSSH**, and **Git/GitHub**.
+This reference document walks the **primary user** through the complete, one-time provisioning of the IIT KGP Capstone environment on `upgrad-l40s-vm03`—from extracting SSH keys and configuring **VS Code (SSH FS)** to setting up **Git/GitHub**, installing **`uv`** with **Python 3.12.14**, installing all **19 pinned ML/Python packages + Jupyter**, and verifying GPU access via Slurm.
 
-> **Important Note on VS Code Remote-SSH:**
-> `upgrad-l40s-vm03` explicitly disables learner SSH port forwarding (`AllowTcpForwarding no`). Because Microsoft's **Remote - SSH** extension requires SSH port forwarding, it will hang indefinitely on *"Waiting for port forwarding to be ready"*. Use the **Local VS Code + Integrated SSH Terminal + Git Sync** workflow below instead—it is fast, reliable, and works within all VM policies.
-
-> **Security Warning:** This personal reference file contains your SSH key passphrase. **Keep this file strictly on your local computer** and **never commit or push it to GitHub** (it is included in the `.gitignore` template below for safety).
+> **Security Warning:** This document contains sensitive account references and your SSH key passphrase. Store it strictly on your local machine (or in an encrypted private vault) and **never commit or push it to GitHub**.
 
 ---
 
-## Quick Reference Details
+## 1. Environment Overview & Key Constraints
+
+Before starting, keep these VM architectural constraints in mind:
+* **No SSH Port Forwarding (`AllowTcpForwarding no`):** Microsoft's **Remote - SSH** extension will hang indefinitely on *"Waiting for port forwarding to be ready"*. This guide uses **SSH FS** (SFTP over port `1026`) + **VS Code's Integrated Terminal**, which is 100% reliable on this VM.
+* **No Hosted Jupyter, `sudo`, or Docker:** All Python tools (`uv`, `.venv`, `jupyter`) are installed in user space (`$HOME`). Direct GPU execution from the SSH login shell is blocked; all GPU workloads must be submitted via **Slurm (`sbatch`)**.
+* **Shared Base Model:** `Qwen/Qwen2.5-7B-Instruct` is pre-downloaded read-only and does **not** count against your storage quota.
+
+### Quick Reference Table
 
 | Setting | Value |
 | :--- | :--- |
-| **Server IP** | `103.42.50.41` |
+| **Server Hostname / IP** | `upgrad-l40s-vm03` / `103.42.50.41` |
 | **SSH Port** | `1026` |
-| **Username** | `Group04` |
-| **Private Key File** | `id_ed25519` (from `TrackA_VM03_Group04.zip`) |
+| **Username** | `learner04` |
+| **Windows Private Key Path** | `C:\Users\Soumen\Downloads\TrackA_VM03_Group04\id_ed25519` |
 | **Key Passphrase** | `2RBENPka3HLZqbJiXwU9-qC1I7Fhy2-r` |
 | **Your Public Key Fingerprint** | `SHA256:uA0OB9GOj8YYlEbqLC2KXLpDQn1XZ6NCe9XHlfk39LE0` |
-| **Expected Server Fingerprint (Ed25519)** | `SHA256:5Ij30L5ol/uHzx7D7a6zdTQNGKIl6WSlRgHHAMRI2tY` |
-| **Remote Home Directory** | `/storage/tracka/users/Group04` |
-| **Starter Project Directory** | `~/project` |
-| **Python Environment** | `~/venv` |
-| **GitHub Repository** | `https://github.com/soumen-chatterjee/iitkgp-capstone.git` |
-| **Access Expires** | `2 December 2026 at 17:27:52 IST` |
+| **Expected Server Fingerprint** | `SHA256:5Ij30L5ol/uHzx7D7a6zdTQNGKIl6WSlRgHHAMRI2tY` |
+| **Remote Home Directory** | `/storage/tracka/users/learner04` (`~`) |
+| **Starter Project Directory** | `/storage/tracka/users/learner04/project` (`~/project`) |
+| **Capstone Git Repo Path** | `/storage/tracka/users/learner04/project/iitkgp-capstone` |
+| **Input Notebooks Folder** | `~/project/iitkgp-capstone/notebooks` |
+| **Output Notebooks Folder** | `~/project/iitkgp-capstone/notebooks_output` |
+| **GitHub Repository URL** | `https://github.com/soumen-chatterjee/iitkgp-capstone.git` |
+| **Storage Quota** | `32 GiB` soft limit / `35 GiB` hard limit |
+| **GPU Allowance** | `75 GPU-hours` total (no automatic reset; max 5 hours/job) |
+| **Access Expiration** | `2 December 2026 at 17:27:52 IST` |
 
 ---
 
-## Step 1: Extract, Secure & Configure SSH (One-Time Setup)
+## 2. Step 1: Extract SSH Keys & Fix File Permissions
 
-Save `TrackA_VM03_Group04.zip` in your `Downloads` folder, then open **Windows PowerShell** and run these commands once.
+OpenSSH strictly rejects private keys that are readable by other users or system groups (causing `Load key ... Permission denied` or `Permission denied (publickey)`).
 
-### 1. Extract the ZIP
-```powershell
-Expand-Archive `
-  -Path "$env:USERPROFILE\Downloads\TrackA_VM03_Group04.zip" `
-  -DestinationPath "$env:USERPROFILE\Downloads\TrackA_VM03_Group04"
+### On Windows (PowerShell)
+1. Extract your assigned ZIP file (if not already extracted):
+   ```powershell
+   Expand-Archive `
+     -Path "$env:USERPROFILE\Downloads\TrackA_VM03_learner04.zip" `
+     -DestinationPath "$env:USERPROFILE\Downloads\TrackA_VM03_Group04"
+   ```
+2. Lock down permissions on `id_ed25519` so only your Windows account has read access:
+   ```powershell
+   $key = "C:\Users\Soumen\Downloads\TrackA_VM03_Group04\id_ed25519"
+   icacls $key /reset
+   icacls $key /inheritance:r
+   icacls $key /grant:r "${env:USERNAME}:(R)"
+   ```
+   *(If `icacls` returns `Access is denied`, open PowerShell **as Administrator**, run `takeown /f $key`, and re-run the three `icacls` lines above.)*
+3. **Verify:** Run `icacls $key`. Only your username with `(R)` should appear.
+
+### On macOS / Linux (Terminal)
+```bash
+unzip "$HOME/Downloads/TrackA_VM03_learner04.zip" -d "$HOME/Downloads/TrackA_VM03_Group04"
+chmod 600 "$HOME/Downloads/TrackA_VM03_Group04/id_ed25519"
 ```
-
-### 2. Lock Down Key Permissions (Prevents `Permission denied (publickey)`)
-Windows OpenSSH rejects private keys that other users or system groups can read:
-```powershell
-$key = "$env:USERPROFILE\Downloads\TrackA_VM03_Group04\id_ed25519"
-icacls $key /inheritance:r
-icacls $key /grant:r "$($env:USERNAME):(R)"
-```
-
-### 3. Verify Your Key Fingerprint
-```powershell
-ssh-keygen -lf "$env:USERPROFILE\Downloads\TrackA_VM03_Group04\id_ed25519.pub"
-```
-Confirm the output matches: `SHA256:uA0OB9GOj8YYlEbqLC2KXLpDQn1XZ6NCe9XHlfk39LE0`
-
-### 4. Create an SSH Alias (`~/.ssh/config`)
-So you can connect with a short `ssh upgrad-l40s-vm03` command, open `C:\Users\<YourWindowsUsername>\.ssh\config` in VS Code (or Notepad) and add:
-```text
-Host upgrad-l40s-vm03
-    HostName 103.42.50.41
-    Port 1026
-    User Group04
-    IdentityFile "C:\Users\<YourWindowsUsername>\Downloads\TrackA_VM03_Group04\id_ed25519"
-    IdentitiesOnly yes
-```
-*(Replace `<YourWindowsUsername>` with your actual Windows username. Do not use `$env:USERPROFILE` or `.pub` here.)*
-
-### 5. Test the SSH Connection
-```powershell
-ssh upgrad-l40s-vm03
-```
-* On first connection, verify the server fingerprint matches:
-  `SHA256:5Ij30L5ol/uHzx7D7a6zdTQNGKIl6WSlRgHHAMRI2tY`
-  Type `yes` and press `Enter`.
-* Enter your passphrase when prompted: `2RBENPka3HLZqbJiXwU9-qC1I7Fhy2-r` (characters will not appear as you type).
-
-> **macOS / Linux Equivalent:**
-> ```bash
-> unzip "$HOME/Downloads/TrackA_VM03_Group04.zip" -d "$HOME/Downloads/TrackA_VM03_Group04"
-> chmod 600 "$HOME/Downloads/TrackA_VM03_Group04/id_ed25519"
-> ```
 
 ---
 
-## Step 2: Configure Git & GitHub on the Remote VM
+## 3. Step 2: Configure SSH Alias & Verify Connection
 
-While logged into the VM via `ssh upgrad-l40s-vm03`, configure Git and connect `~/project` to your GitHub repository.
+1. Open (or create) your local SSH config file:
+   * **Windows:** `C:\Users\Soumen\.ssh\config`
+   * **macOS / Linux:** `~/.ssh/config`
+2. Add the following host block (do **not** point `IdentityFile` to `.pub`, and do **not** use PowerShell variables like `$env:USERPROFILE` inside this file):
+   ```text
+   Host upgrad-l40s-vm03
+       HostName 103.42.50.41
+       Port 1026
+       User learner04
+       IdentityFile "C:\Users\Soumen\Downloads\TrackA_VM03_Group04\id_ed25519"
+       IdentitiesOnly yes
+   ```
+3. Test the connection from PowerShell / Terminal:
+   ```powershell
+   ssh upgrad-l40s-vm03
+   ```
+4. **First-time verification:** Confirm the server's Ed25519 fingerprint matches `SHA256:5Ij30L5ol/uHzx7D7a6zdTQNGKIl6WSlRgHHAMRI2tY`, type `yes`, and enter your passphrase. Your prompt should change to `learner04@upgrad-l40s-vm03:~$`.
 
-### 1. Set Your Git Identity
+---
+
+## 4. Step 3: Set Up VS Code with SSH FS & Fix the Integrated Terminal
+
+First, install the extension:
+1. Open **Microsoft VS Code** and press `Ctrl + Shift + X` (**Extensions**).
+2. Search for **SSH FS** (published by **Kelvin Schoofs**) and click **Install**.
+
+Now configure **SSH FS** using **Option A (Fast `settings.json` Copy-Paste)** or **Option B (UI Form)**.
+
+### Option A: Fast Setup via `settings.json` (Recommended)
+1. Press `Ctrl + Shift + P` in VS Code, type **Preferences: Open User Settings (JSON)**, and press `Enter`.
+2. Add the `"sshfs.configs"` and `"terminal.integrated.cwd"` entries inside the top-level `{ ... }` JSON object (ensure there is a comma after the previous setting):
+   ```json
+   "sshfs.configs": [
+     {
+       "name": "upgrad-l40s-vm03",
+       "label": "upgrad-l40s-vm03 (Track A)",
+       "host": "103.42.50.41",
+       "port": 1026,
+       "username": "learner04",
+       "root": "/storage/tracka/users/learner04/project",
+       "privateKeyPath": "C:\\Users\\Soumen\\Downloads\\TrackA_VM03_Group04\\id_ed25519",
+       "passphrase": true
+     }
+   ],
+   "terminal.integrated.cwd": "C:\\Users\\Soumen"
+   ```
+   > **JSON Tips:**
+   > * Windows paths inside JSON **must** use double backslashes (`\\`).
+   > * `"passphrase": true` prompts you securely in the VS Code top bar whenever you connect (avoid storing plaintext passphrases inside `settings.json`).
+3. Save `settings.json` (`Ctrl + S`).
+
+### Option B: Setup via the SSH FS UI Form
+1. Click the **SSH FS** icon in the left Activity Bar.
+2. Next to **Configurations**, click **+** (*Create a SSH FS configuration*), type `upgrad-l40s-vm03`, press `Enter`, and click **Configure**.
+3. Fill in these exact fields and click **Save**:
+   * **Root:** `/storage/tracka/users/learner04/project`
+   * **Host:** `103.42.50.41`
+   * **Port:** `1026`
+   * **Username:** `learner04`
+   * **Private Key Path:** `C:\Users\Soumen\Downloads\TrackA_VM03_Group04\id_ed25519`
+   * **Passphrase:** Select **Prompt**
+
+### Mount Your Remote Folder & Open Terminals
+1. Click the **SSH FS** icon in the Activity Bar, hover over `upgrad-l40s-vm03`, and click **Add as Workspace folder** (folder with `+`).
+2. Enter your key passphrase in the top bar when prompted, then press `Ctrl + Shift + E` (**Explorer**) to verify your remote files appear.
+3. **Opening Terminals Cleanly:**
+   * **Direct Remote VM Terminal (Fastest):** Hover over `upgrad-l40s-vm03` in the **SSH FS** sidebar and click the **Open terminal** icon (`>_`).
+   * **Local PowerShell Terminal (`Ctrl + \``):** With `"terminal.integrated.cwd"` set above, pressing `` Ctrl + ` `` opens local PowerShell cleanly without a missing Linux directory error; run `ssh upgrad-l40s-vm03` from there anytime.
+
+---
+
+## 5. Step 4: Configure Git & Connect to GitHub on the VM
+
+Open a remote SSH terminal on `upgrad-l40s-vm03` and run the steps below.
+
+### A. Set Global Git Identity (Preventing `GH007` Email Privacy Errors)
+GitHub blocks pushes if your commit email is private (`GH007: Your push would publish a private email address`). Always use your GitHub `noreply` address found at `https://github.com/settings/emails` under **Keep my email addresses private**:
+
 ```bash
 git config --global user.name "Soumen Chatterjee"
-git config --global user.email "your.email@example.com"
+git config --global user.email "<your-id>+soumen-chatterjee@users.noreply.github.com"
 git config --global init.defaultBranch main
+git config --global credential.helper store
+```
+> **Authentication Note:** GitHub requires a **Personal Access Token (PAT)** instead of your account password when pushing over HTTPS. Generate a fine-grained PAT with **Contents: Read and write** permission for `iitkgp-capstone` and paste it when prompted for a password on your first push. `credential.helper store` saves it in `~/.git-credentials` on the VM.
+
+### B. Initialize the Repository, Standard Folders & `.gitignore`
+Navigate to your project directory and create the standard `notebooks/`, `notebooks_output/`, and `logs/` folders:
+
+```bash
+mkdir -p ~/project/iitkgp-capstone/{notebooks,notebooks_output,logs}
+cd ~/project/iitkgp-capstone
+git init
+git remote add origin https://github.com/soumen-chatterjee/iitkgp-capstone.git
 ```
 
-### 2. Set Up GitHub Authentication (Personal Access Token)
-GitHub requires a **Personal Access Token (PAT)** instead of your account password for HTTPS:
-1. On GitHub in your browser, go to **Settings → Developer settings → Personal access tokens → Fine-grained tokens** (or **Tokens (classic)**).
-2. Create a token with **Repository permissions → Contents: Read and write** (Fine-grained) or the **`repo`** scope (Classic), and copy it.
-3. On the VM, enable Git's credential helper so you only enter the token once:
-   ```bash
-   git config --global credential.helper store
-   ```
-   *(On your first `git push` or `git pull`, enter your GitHub username and paste the PAT as the password.)*
+Create a strict `.gitignore` so large model weights, virtual environments, Slurm logs, and credentials are never pushed to GitHub:
 
-> **Cleanup Reminder:** Before access expires, remove saved credentials on the VM with `rm -f ~/.git-credentials` and revoke the token on GitHub.
-
-### 3. Add a `.gitignore` File (Mandatory Before First Commit)
-Keep large model weights, checkpoints, logs, and credentials out of GitHub:
 ```bash
-cd ~/project
 cat << 'EOF' > .gitignore
 # Python & Virtual Environments
 __pycache__/
 *.py[cod]
-venv/
 .venv/
+venv/
 .ipynb_checkpoints/
 
-# Training Logs & Outputs
+# Slurm Logs & Model Checkpoints
 logs/
 *.out
 *.err
-
-# Model Weights & Checkpoints (too large for GitHub)
 checkpoints/
 *.safetensors
 *.bin
 *.pt
 *.pth
 *.ckpt
-*.gguf
 
-# Sensitive / Local Reference Files
+# Secrets, Keys & Local Reference Docs
 id_ed25519
 *.pem
 .git-credentials
+.env
+01_primary_user_initial_setup.md
 vscode_vm_git_guide.md
-
-# OS / Editor files
-.DS_Store
 .vscode/
 EOF
 ```
 
-### 4. Link `~/project` and Push Starter Files to GitHub
+### C. Commit & Push the Initial Branch
+Check if GitHub already has a branch (`git ls-remote --heads origin`). For a fresh repository:
+
 ```bash
-cd ~/project
-git init
-git remote add origin https://github.com/soumen-chatterjee/iitkgp-capstone.git
-
-# If your GitHub repo already has files (e.g., README.md), pull them first:
-git pull origin main --allow-unrelated-histories
-
+git branch -M main
 git add .
-git commit -m "Initial commit with Track A starter files"
+git commit -m "Initial commit: project structure and .gitignore"
 git push -u origin main
 ```
+*(If you ever accidentally commit with a private email and hit `GH007`, update `git config --global user.email` to your `noreply` address, run `git commit --amend --reset-author --no-edit`, and re-run `git push -u origin main`.)*
 
 ---
 
-## Step 3: Most Reliable Daily Workflow (Recommended)
+## 6. Step 5: Install `uv` and Python 3.12.14 on the VM
 
-### Option 1: Local VS Code + Integrated SSH Terminal + Git Sync (Most Reliable)
-This gives you full VS Code editing, linting, and Copilot/extensions locally with zero connection drops, while running all Slurm training jobs on the VM.
+We use **`uv`** (Astral's fast Python package and version manager) with **Python 3.12.14** because bleeding-edge releases (such as Python 3.15) lack pre-built binary wheels for CUDA `torch` and `bitsandbytes`.
 
-1. **Clone the repository locally on Windows:**
-   In PowerShell (in your preferred local projects folder):
-   ```powershell
-   git clone https://github.com/soumen-chatterjee/iitkgp-capstone.git
-   code iitkgp-capstone
-   ```
-2. **Open two terminal tabs inside VS Code** (press `` Ctrl + ` ``, then click `+` to add a second terminal):
-   * **Terminal 1 (Local PowerShell):** Used for `git add`, `git commit`, and `git push`.
-   * **Terminal 2 (Remote VM SSH):** Run `ssh upgrad-l40s-vm03` and `cd ~/project`. Used for `git pull` and Slurm commands (`sbatch`, `squeue`, `tail`).
-3. **Your smooth edit-and-train loop:**
-   * Edit `train.py`, `train.sbatch`, or `infer.py` in local VS Code.
-   * **Local terminal:**
-     ```powershell
-     git add .
-     git commit -m "Update hyperparameters"
-     git push
-     ```
-   * **VM SSH terminal:**
-     ```bash
-     git pull
-     sbatch train.sbatch
-     squeue --me
-     ```
-
----
-
-### Option 2: Direct Quick File Upload with `scp` (No Git Commit Needed)
-If you want to test a quick edit to a single file (like `train.sbatch` or a dataset file) without making a Git commit, run `scp` from a **local Windows PowerShell** terminal:
-
-```powershell
-# Upload a single file from Windows to the VM
-scp -i "$env:USERPROFILE\Downloads\TrackA_VM03_Group04\id_ed25519" `
-  -P 1026 .\train.sbatch Group04@103.42.50.41:~/project/
-
-# Upload a dataset file to the VM
-scp -i "$env:USERPROFILE\Downloads\TrackA_VM03_Group04\id_ed25519" `
-  -P 1026 .\my_dataset.jsonl Group04@103.42.50.41:~/project/
-```
-*(Note: `scp` uses uppercase `-P` for the port number.)*
-
----
-
-### Option 3: VS Code Remote - Tunnels (If You Want Direct Remote Editing)
-Unlike Remote-SSH, **Remote - Tunnels** connects over outbound HTTPS rather than SSH port forwarding. *(This works only if the VM allows outbound HTTPS to GitHub/Microsoft.)*
-
-1. **On the VM (via SSH):**
+1. **Install `uv` into `$HOME/.local/bin` (no `sudo` needed):**
    ```bash
-   curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-linux-x64' --output vscode_cli.tar.gz
-   tar -xf vscode_cli.tar.gz
-   ./code tunnel
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   source "$HOME/.local/bin/env"
+   uv --version
    ```
-   Follow the prompt to authenticate with your GitHub account.
-2. **In local VS Code:**
-   * Install the **Remote - Tunnels** extension (`ms-vscode.remote-server`).
-   * Press `Ctrl + Shift + P` → **`Remote Tunnels: Connect to Tunnel...`** → select your VM.
-   * Open `/storage/tracka/users/Group04/project`.
+   *(Verify that `source "$HOME/.local/bin/env"` or `$HOME/.local/bin` is added to `~/.bashrc` so future SSH sessions recognize `uv` automatically.)*
 
-*(Tip: Keep an eye on `quota -s` if using Remote - Tunnels, as VS Code's server files take ~200–400 MB of your storage quota.)*
+2. **Install Python 3.12.14:**
+   ```bash
+   uv python install 3.12.14
+   uv python list --only-installed
+   ```
+   *(If you previously installed Python 3.15 and want to reclaim disk space, remove it with `uv python uninstall 3.15`.)*
+
+3. **Create the project virtual environment (`.venv`) inside `~/project/iitkgp-capstone`:**
+   ```bash
+   cd ~/project/iitkgp-capstone
+   uv venv .venv --python 3.12.14 --clear
+   source .venv/bin/activate
+   python --version
+   ```
+   **Verification:** Your prompt displays `(.venv)` and `python --version` prints `Python 3.12.14`.
 
 ---
 
-## Quick Reference: Slurm Jobs, Limits & Backups
+## 7. Step 6: Install All 19 Pinned Packages + `jupyter` & `nbconvert`
 
-### Running & Monitoring Jobs (On the VM)
-Direct GPU use from the SSH login shell is blocked. Always run training and GPU inference through **Slurm**:
+Across all four capstone notebooks, there are **19 unique packages**, plus `jupyter`, `nbconvert`, and `ipykernel` so notebooks can be executed headlessly via Slurm (`sbatch`). Because `torch==2.9.1+cu126` is a CUDA 12.6 wheel hosted on PyTorch's dedicated index, install it first, then install the remaining packages.
+
+### A. Install PyTorch 2.9.1 (CUDA 12.6)
 ```bash
-cd ~/project
-mkdir -p logs
-sbatch train.sbatch               # Submit job (note the returned JOB_ID)
-squeue --me                       # Check status (PD = Pending, R = Running)
-sacct -X --starttime today --format=JobID,JobName,State,Elapsed,AllocTRES
-
-# Inspect logs & training summary (replace 123 with your JOB_ID)
-JOB_ID=123
-tail -n 40 "$HOME/project/logs/qlora-$JOB_ID.out"
-tail -n 40 "$HOME/project/logs/qlora-$JOB_ID.err"
-cat "$HOME/checkpoints/job-$JOB_ID/training_summary.json"
-
-scancel "$JOB_ID"                 # Cancel your own job
-quota -s                          # Check storage quota (32 GiB soft / 35 GiB hard)
-source ~/venv/bin/activate        # Activate Python env when inspecting scripts
+cd ~/project/iitkgp-capstone
+uv pip install --python .venv/bin/python \
+  --index-url https://download.pytorch.org/whl/cu126 \
+  torch==2.9.1+cu126
 ```
 
-### Cohort Limits
-* **GPU Allowance:** 75 GPU-hours per learner (no automatic reset; waiting in queue does not consume GPU time).
-* **Concurrency:** 1 running GPU job across the entire VM at a time; max 1 running + 1 pending job per learner.
-* **Max Job Duration:** 5 hours with `--gres=gpu:1`.
-* **Storage:** 32 GiB soft / 35 GiB hard limit (shared base model weights do not count against your quota).
+### B. Install the Remaining 18 Pinned Packages + Jupyter Tooling
+```bash
+uv pip install --python .venv/bin/python \
+  transformers==5.23.0 \
+  peft==0.21.3 \
+  accelerate==1.16.0 \
+  bitsandbytes==0.50.2 \
+  datasets==5.2.0 \
+  trl==1.18.1 \
+  scikit-learn==1.9.1 \
+  scipy==1.18.1 \
+  rouge-score==0.1.2 \
+  pandas==3.1.1 \
+  numpy==2.5.5 \
+  matplotlib==3.11.1 \
+  jinja2==3.1.6 \
+  requests==2.34.2 \
+  fastapi==0.165.0 \
+  httpx==0.28.1 \
+  pytest==9.2.0 \
+  pyyaml==6.0.3 \
+  jupyter \
+  nbconvert \
+  ipykernel
+```
 
-### Backing Up Work to Windows (Before `2 December 2026 at 17:27:52 IST`)
-Run in a **local Windows PowerShell** window (not inside the VM):
-```powershell
-# Backup project code
-scp -i "$env:USERPROFILE\Downloads\TrackA_VM03_Group04\id_ed25519" `
-  -P 1026 -r Group04@103.42.50.41:project `
-  "$env:USERPROFILE\Downloads\TrackA_project_backup"
-
-# Backup saved LoRA adapters/checkpoints
-scp -i "$env:USERPROFILE\Downloads\TrackA_VM03_Group04\id_ed25519" `
-  -P 1026 -r Group04@103.42.50.41:checkpoints `
-  "$env:USERPROFILE\Downloads\TrackA_checkpoints_backup"
+### C. Save a `requirements-lock.txt` Snapshot for Version Control (Recommended)
+```bash
+uv pip freeze --python .venv/bin/python > requirements-lock.txt
 ```
 
 ---
 
-## Troubleshooting
+## 8. Step 7: Final Verification & GPU Health Check
 
-1. **VS Code Remote-SSH hangs on *"Waiting for port forwarding to be ready"*:**
-   * Expected behavior on VM03 due to disabled SSH port forwarding. Close the Remote-SSH window and use **Option 1 (Local VS Code + Integrated SSH Terminal + Git Sync)**.
-2. **`Permission denied (publickey)` in PowerShell:**
-   * Re-run the `icacls` permission commands in **Step 1**.
-   * Verify you are pointing to `id_ed25519` (not `id_ed25519.pub`) and using `User Group04`.
-   * Run `ssh -v upgrad-l40s-vm03` to inspect detailed debug output.
-3. **Storage Quota Exceeded:**
-   * Run `quota -s` and delete obsolete run folders inside `~/checkpoints/`.
-4. **Connection Timeout:**
-   * Verify your internet connection and contact your coordinator with the timestamp and SSH port `1026`. Never share your private key or passphrase.
+### A. Verify Packages, Jupyter, Git & Quota (Login Shell)
+Run this block on the VM to confirm Python, Jupyter, Git, and disk space are healthy:
+
+```bash
+cd ~/project/iitkgp-capstone
+
+# 1. Verify Python, core ML imports & Jupyter nbconvert
+.venv/bin/python -c "import torch, transformers, peft, bitsandbytes, trl; print('Python OK | Torch:', torch.__version__, '| Transformers:', transformers.__version__)"
+.venv/bin/jupyter nbconvert --version
+
+# 2. Verify all 19 pinned packages + jupyter
+uv pip list --python .venv/bin/python | grep -E "torch|transformers|peft|accelerate|bitsandbytes|datasets|trl|scikit-learn|scipy|rouge-score|pandas|numpy|matplotlib|jinja2|requests|fastapi|httpx|pytest|PyYAML|jupyter|nbconvert|ipykernel"
+
+# 3. Verify Git remote & status
+git remote -v
+git status
+
+# 4. Check disk usage against the 32 GiB soft / 35 GiB hard limit
+quota -s
+```
+
+### B. Test the GPU via Slurm (`sbatch`)
+Because direct GPU access is blocked in the SSH login shell, verify CUDA and PyTorch GPU visibility by submitting a lightweight, 5-second Slurm job (`test_gpu.sbatch`):
+
+1. **Create `test_gpu.sbatch`:**
+   ```bash
+   cd ~/project/iitkgp-capstone
+   mkdir -p logs
+
+   cat << 'EOF' > test_gpu.sbatch
+   #!/bin/bash
+   #SBATCH --job-name=test_gpu
+   #SBATCH --gres=gpu:1
+   #SBATCH --time=00:05:00
+   #SBATCH --output=logs/test_gpu-%j.out
+   #SBATCH --error=logs/test_gpu-%j.err
+
+   source /storage/tracka/users/learner04/project/iitkgp-capstone/.venv/bin/activate
+
+   echo "=== nvidia-smi ==="
+   nvidia-smi
+
+   echo "=== PyTorch CUDA Check ==="
+   python -c "
+   import torch
+   print('PyTorch:', torch.__version__)
+   print('CUDA available:', torch.cuda.is_available())
+   assert torch.cuda.is_available(), 'CUDA is not available!'
+   print('Device count:', torch.cuda.device_count())
+   print('Device name:', torch.cuda.get_device_name(0))
+   free, total = torch.cuda.mem_get_info(0)
+   print(f'VRAM: {free/2**30:.1f} GiB free / {total/2**30:.1f} GiB total')
+   x = torch.randn((1024, 1024), device='cuda')
+   print('Matrix multiply test OK:', (x @ x).mean().item())
+   "
+   EOF
+   ```
+2. **Submit and check the output:**
+   ```bash
+   sbatch test_gpu.sbatch
+   squeue --me
+   ```
+3. **Read the log once it finishes** (replace `<JOB_ID>` with the number returned by `sbatch`):
+   ```bash
+   cat logs/test_gpu-<JOB_ID>.out
+   cat logs/test_gpu-<JOB_ID>.err
+   ```
+   **Verification:** The `.out` log prints `CUDA available: True`, the NVIDIA L40S GPU name and VRAM, and `Matrix multiply test OK`, while `.err` is empty.
+
+---
+
+## 9. SSH FS Quick Troubleshooting
+
+| SSH FS Symptom / Error | Cause & Fix |
+| :--- | :--- |
+| **`All configured authentication methods failed`** | Usually caused by: (1) pointing `privateKeyPath` to `id_ed25519.pub` instead of `id_ed25519`, (2) missing the passphrase prompt at the top of the VS Code window, or (3) single backslashes (`\`) instead of double backslashes (`\\`) in `settings.json`. |
+| **`Error: ENOENT` or `Cannot read privateKeyPath`** | The path in `privateKeyPath` does not exist or Windows permissions block reading it. Verify the exact path and re-run the `icacls` commands in **Step 1**. |
+| **Folder won't expand or files fail to save after sleep/Wi-Fi switch** | The SFTP session timed out. In the **SSH FS** sidebar, click the **Disconnect** icon next to `upgrad-l40s-vm03` (or press `Ctrl + Shift + P` → **Developer: Reload Window**) and reconnect. |
+| **Terminal fails: `Starting directory (cwd) "\storage\..." does not exist`** | VS Code tried to open local PowerShell in the mounted Linux path. Set `"terminal.integrated.cwd": "C:\\Users\\Soumen"` in `settings.json`, or use the **SSH FS** `>_` (**Open terminal**) button. |
+| **Detailed error logs needed** | Open the **Output** panel (`Ctrl + Shift + U`) and select **SSH FS** from the top-right dropdown to see exact SFTP/SSH connection logs. |
+
+Once all checks pass, hand **`02_team_user_daily_workflow.md`** to your team members so they can connect and start coding immediately.
