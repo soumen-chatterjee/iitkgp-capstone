@@ -28,3 +28,6 @@ vscode_vm_git_guide.md
 # OS / Editor files
 .DS_Store
 .vscode/
+
+# Intermidiate result files
+iitkgp-capstone/notebooks/capstone_it_helpdesk/
