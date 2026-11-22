@@ -1,0 +1,43 @@
+{
+  "dataset": "Tobi-Bueck/customer-support-tickets",
+  "license": "CC BY-NC 4.0",
+  "language": "en",
+  "seed": 42,
+  "queues": [
+    "Technical Support",
+    "IT Support",
+    "Service Outages and Maintenance"
+  ],
+  "types": [
+    "Change",
+    "Incident",
+    "Problem",
+    "Request"
+  ],
+  "priorities": [
+    "high",
+    "low",
+    "medium"
+  ],
+  "counts": {
+    "train": 1500,
+    "val": 100,
+    "test": 180
+  },
+  "sha256": {
+    "train": "1dee2cc5259a55b0ae7d5060ce344e1e61cc64e5c9883b88980f5fc696d6edff",
+    "val": "9e88d592445e38a88652c40b4a359a758c1e1f85ffb52ed2f6633bd1f2d43b27",
+    "test": "4ed79e20ab0be0de83579cc73ea406f055df6aab304d1d3dabfb76f6ccdfd837"
+  },
+  "filters": {
+    "body_chars": [
+      40,
+      1200
+    ],
+    "answer_chars": [
+      60,
+      900
+    ],
+    "dedup_sim": 0.9
+  }
+}

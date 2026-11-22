@@ -1,0 +1,11 @@
+{
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "load_4bit": true,
+  "dtype": "torch.bfloat16",
+  "max_new_tokens": 320,
+  "gen_batch": 8,
+  "k_shot": 3,
+  "smoke_n": null,
+  "system_sha": "6375eb875f261c20",
+  "test_sha": "4ed79e20ab0be0de"
+}
