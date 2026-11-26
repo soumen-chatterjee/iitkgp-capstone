@@ -4,6 +4,8 @@ Welcome to the IIT KGP Capstone environment on `upgrad-l40s-vm03`. The primary u
 
 This guide explains how **subsequent users / team members** connect to the VM via VS Code, edit `.ipynb` and `.py` files, test the GPU, execute notebooks and training jobs through **Slurm (`sbatch`)**, and collaborate cleanly using **Git & GitHub**.
 
+![alt text](image-1.png)
+
 ---
 
 ## 1. Shared Account Ground Rules & Limits
