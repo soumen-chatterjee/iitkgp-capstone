@@ -1,0 +1,377 @@
+{
+  "timestamp": "2026-11-26 20:15:49",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "adapter_run": "B",
+  "smoke": false,
+  "n_test": 180,
+  "systems": {
+    "base \u00b7 zero-shot": {
+      "n": 180.0,
+      "json_parse_rate": 1.0,
+      "schema_valid_rate": 1.0,
+      "queue_acc": 0.65,
+      "type_acc": 0.7277777777777777,
+      "priority_acc": 0.5,
+      "labels_exact_match": 0.2,
+      "queue_macro_f1": 0.4936824823921598,
+      "priority_macro_f1": 0.3792748687384703,
+      "rougeL_resolution": 0.22029155808285508,
+      "mean_prompt_len": 253.6888888888889,
+      "mean_out_tokens": 90.56666666666666,
+      "gen_sec_per_ticket": 0.335187913005,
+      "tokens_per_sec": 270.1966961001833,
+      "retrieval_ms_p50": 0.0,
+      "e2e_sec_per_ticket": 0.335187913005
+    },
+    "fine-tuned": {
+      "n": 180.0,
+      "json_parse_rate": 1.0,
+      "schema_valid_rate": 1.0,
+      "queue_acc": 0.6722222222222223,
+      "type_acc": 0.7833333333333333,
+      "priority_acc": 0.5333333333333333,
+      "labels_exact_match": 0.28888888888888886,
+      "queue_macro_f1": 0.4752523290411263,
+      "priority_macro_f1": 0.24224664224664225,
+      "rougeL_resolution": 0.31213679535230865,
+      "mean_prompt_len": 253.6888888888889,
+      "mean_out_tokens": 91.86111111111111,
+      "gen_sec_per_ticket": 0.8528106910255556,
+      "tokens_per_sec": 107.7157123823608,
+      "retrieval_ms_p50": 0.0,
+      "e2e_sec_per_ticket": 0.8528106910255556
+    },
+    "base + RAG": {
+      "n": 180.0,
+      "json_parse_rate": 1.0,
+      "schema_valid_rate": 1.0,
+      "queue_acc": 0.6277777777777778,
+      "type_acc": 0.7111111111111111,
+      "priority_acc": 0.5666666666666667,
+      "labels_exact_match": 0.26666666666666666,
+      "queue_macro_f1": 0.5096560846560846,
+      "priority_macro_f1": 0.39846255423505,
+      "rougeL_resolution": 0.3221895762526385,
+      "mean_prompt_len": 914.4,
+      "mean_out_tokens": 106.87777777777778,
+      "gen_sec_per_ticket": 0.4762825957933333,
+      "tokens_per_sec": 224.39992290659674,
+      "retrieval_ms_p50": 0.21330080926418304,
+      "e2e_sec_per_ticket": 0.4764958966025975
+    },
+    "fine-tuned + RAG": {
+      "n": 180.0,
+      "json_parse_rate": 1.0,
+      "schema_valid_rate": 1.0,
+      "queue_acc": 0.6277777777777778,
+      "type_acc": 0.7833333333333333,
+      "priority_acc": 0.55,
+      "labels_exact_match": 0.2722222222222222,
+      "queue_macro_f1": 0.46915440061094893,
+      "priority_macro_f1": 0.38893914801905116,
+      "rougeL_resolution": 0.34507361942299497,
+      "mean_prompt_len": 914.4,
+      "mean_out_tokens": 108.57777777777778,
+      "gen_sec_per_ticket": 1.0025952599377779,
+      "tokens_per_sec": 108.29671963990357,
+      "retrieval_ms_p50": 0.21330080926418304,
+      "e2e_sec_per_ticket": 1.002808560747042
+    },
+    "retrieval-only (kNN)": {
+      "n": 180.0,
+      "json_parse_rate": 1.0,
+      "schema_valid_rate": 1.0,
+      "queue_acc": 0.5944444444444444,
+      "type_acc": 0.7166666666666667,
+      "priority_acc": 0.5111111111111111,
+      "labels_exact_match": 0.2111111111111111,
+      "queue_macro_f1": 0.4554781262098335,
+      "priority_macro_f1": 0.3973405293447035,
+      "rougeL_resolution": 0.29488646104303656,
+      "mean_prompt_len": 0.0,
+      "mean_out_tokens": 0.0,
+      "gen_sec_per_ticket": 0.0,
+      "tokens_per_sec": NaN,
+      "retrieval_ms_p50": 0.21330080926418304,
+      "e2e_sec_per_ticket": 0.00021330080926418304
+    }
+  },
+  "majority_floor": {
+    "queue_acc": 0.6444444444444445,
+    "type_acc": 0.5,
+    "priority_acc": 0.5388888888888889,
+    "labels_exact_match": 0.2,
+    "queue_macro_f1": 0.26126126126126126,
+    "priority_macro_f1": 0.23345367027677497
+  },
+  "bootstrap": [
+    {
+      "A": "fine-tuned + RAG",
+      "B": "fine-tuned",
+      "question": "what RAG adds to the fine-tuned model",
+      "metric": "labels_exact_match",
+      "A\u2212B": -0.016666666666666666,
+      "ci_low": -0.08333333333333333,
+      "ci_high": 0.05555555555555555,
+      "verdict": "within noise"
+    },
+    {
+      "A": "fine-tuned + RAG",
+      "B": "fine-tuned",
+      "question": "what RAG adds to the fine-tuned model",
+      "metric": "queue_acc",
+      "A\u2212B": -0.044444444444444446,
+      "ci_low": -0.10555555555555556,
+      "ci_high": 0.016666666666666666,
+      "verdict": "within noise"
+    },
+    {
+      "A": "fine-tuned + RAG",
+      "B": "fine-tuned",
+      "question": "what RAG adds to the fine-tuned model",
+      "metric": "priority_acc",
+      "A\u2212B": 0.016666666666666666,
+      "ci_low": -0.05,
+      "ci_high": 0.08333333333333333,
+      "verdict": "within noise"
+    },
+    {
+      "A": "fine-tuned + RAG",
+      "B": "fine-tuned",
+      "question": "what RAG adds to the fine-tuned model",
+      "metric": "rougeL_resolution",
+      "A\u2212B": 0.03293682407068633,
+      "ci_low": 0.008758930127997416,
+      "ci_high": 0.05836776980129923,
+      "verdict": "clear gain"
+    },
+    {
+      "A": "base + RAG",
+      "B": "base \u00b7 zero-shot",
+      "question": "what RAG adds to the base model",
+      "metric": "labels_exact_match",
+      "A\u2212B": 0.06666666666666667,
+      "ci_low": 0.0,
+      "ci_high": 0.1388888888888889,
+      "verdict": "within noise"
+    },
+    {
+      "A": "base + RAG",
+      "B": "base \u00b7 zero-shot",
+      "question": "what RAG adds to the base model",
+      "metric": "queue_acc",
+      "A\u2212B": -0.022222222222222223,
+      "ci_low": -0.08333333333333333,
+      "ci_high": 0.044444444444444446,
+      "verdict": "within noise"
+    },
+    {
+      "A": "base + RAG",
+      "B": "base \u00b7 zero-shot",
+      "question": "what RAG adds to the base model",
+      "metric": "priority_acc",
+      "A\u2212B": 0.06666666666666667,
+      "ci_low": -0.011111111111111112,
+      "ci_high": 0.14444444444444443,
+      "verdict": "within noise"
+    },
+    {
+      "A": "base + RAG",
+      "B": "base \u00b7 zero-shot",
+      "question": "what RAG adds to the base model",
+      "metric": "rougeL_resolution",
+      "A\u2212B": 0.1018980181697834,
+      "ci_low": 0.07905231878286853,
+      "ci_high": 0.12596847121015242,
+      "verdict": "clear gain"
+    },
+    {
+      "A": "fine-tuned + RAG",
+      "B": "base + RAG",
+      "question": "what fine-tuning adds once RAG is present",
+      "metric": "labels_exact_match",
+      "A\u2212B": 0.005555555555555556,
+      "ci_low": -0.05,
+      "ci_high": 0.06111111111111111,
+      "verdict": "within noise"
+    },
+    {
+      "A": "fine-tuned + RAG",
+      "B": "base + RAG",
+      "question": "what fine-tuning adds once RAG is present",
+      "metric": "queue_acc",
+      "A\u2212B": 0.0,
+      "ci_low": -0.03888888888888889,
+      "ci_high": 0.03888888888888889,
+      "verdict": "within noise"
+    },
+    {
+      "A": "fine-tuned + RAG",
+      "B": "base + RAG",
+      "question": "what fine-tuning adds once RAG is present",
+      "metric": "priority_acc",
+      "A\u2212B": -0.016666666666666666,
+      "ci_low": -0.08888888888888889,
+      "ci_high": 0.05555555555555555,
+      "verdict": "within noise"
+    },
+    {
+      "A": "fine-tuned + RAG",
+      "B": "base + RAG",
+      "question": "what fine-tuning adds once RAG is present",
+      "metric": "rougeL_resolution",
+      "A\u2212B": 0.022884043170356524,
+      "ci_low": 0.009286561911112377,
+      "ci_high": 0.03662263480232646,
+      "verdict": "clear gain"
+    },
+    {
+      "A": "fine-tuned",
+      "B": "base \u00b7 zero-shot",
+      "question": "what fine-tuning adds without RAG",
+      "metric": "labels_exact_match",
+      "A\u2212B": 0.08888888888888889,
+      "ci_low": 0.022222222222222223,
+      "ci_high": 0.15555555555555556,
+      "verdict": "clear gain"
+    },
+    {
+      "A": "fine-tuned",
+      "B": "base \u00b7 zero-shot",
+      "question": "what fine-tuning adds without RAG",
+      "metric": "queue_acc",
+      "A\u2212B": 0.022222222222222223,
+      "ci_low": -0.016666666666666666,
+      "ci_high": 0.06124999999999798,
+      "verdict": "within noise"
+    },
+    {
+      "A": "fine-tuned",
+      "B": "base \u00b7 zero-shot",
+      "question": "what fine-tuning adds without RAG",
+      "metric": "priority_acc",
+      "A\u2212B": 0.03333333333333333,
+      "ci_low": -0.06111111111111111,
+      "ci_high": 0.13333333333333333,
+      "verdict": "within noise"
+    },
+    {
+      "A": "fine-tuned",
+      "B": "base \u00b7 zero-shot",
+      "question": "what fine-tuning adds without RAG",
+      "metric": "rougeL_resolution",
+      "A\u2212B": 0.09184523726945358,
+      "ci_low": 0.07376538608342288,
+      "ci_high": 0.10991973991947093,
+      "verdict": "clear gain"
+    }
+  ],
+  "context_use": {
+    "base \u00b7 zero-shot": {
+      "reply_overlap_with_ctx": 0.21646539755738475,
+      "queue_agrees_with_neighbours": 0.7333333333333333,
+      "priority_agrees_with_neighbours": 0.40555555555555556
+    },
+    "base + RAG": {
+      "reply_overlap_with_ctx": 0.5146152458817385,
+      "queue_agrees_with_neighbours": 0.8888888888888888,
+      "priority_agrees_with_neighbours": 0.6166666666666667
+    },
+    "fine-tuned": {
+      "reply_overlap_with_ctx": 0.3170954254390909,
+      "queue_agrees_with_neighbours": 0.7388888888888889,
+      "priority_agrees_with_neighbours": 0.6333333333333333
+    },
+    "fine-tuned + RAG": {
+      "reply_overlap_with_ctx": 0.6430850567087195,
+      "queue_agrees_with_neighbours": 0.8833333333333333,
+      "priority_agrees_with_neighbours": 0.7611111111111111
+    }
+  },
+  "retrieval_quality": {
+    "val": {
+      "queue_p": 0.5733333333333334,
+      "type_p": 0.6766666666666669,
+      "priority_p": 0.5333333333333333,
+      "res_rougeL": 0.25111534198046453,
+      "ctx_score": 0.5086121688284495
+    },
+    "test": {
+      "queue_p": 0.5666666666666667,
+      "type_p": 0.6759259259259259,
+      "priority_p": 0.4666666666666667,
+      "res_rougeL": 0.25425185371387615,
+      "ctx_score": 0.4908777782432838
+    }
+  },
+  "retrieval_latency_ms": {
+    "p50": 0.21330080926418304,
+    "p95": 0.25058565661311144,
+    "n": 30
+  },
+  "judge": null,
+  "failure_breakdown": {
+    "base \u00b7 zero-shot": {
+      "unparseable JSON": 0,
+      "parsed, schema invalid": 0,
+      "valid, wrong queue": 63,
+      "valid, wrong priority": 90,
+      "hit generation cap": 0
+    },
+    "fine-tuned": {
+      "unparseable JSON": 0,
+      "parsed, schema invalid": 0,
+      "valid, wrong queue": 59,
+      "valid, wrong priority": 84,
+      "hit generation cap": 0
+    },
+    "base + RAG": {
+      "unparseable JSON": 0,
+      "parsed, schema invalid": 0,
+      "valid, wrong queue": 67,
+      "valid, wrong priority": 78,
+      "hit generation cap": 0
+    },
+    "fine-tuned + RAG": {
+      "unparseable JSON": 0,
+      "parsed, schema invalid": 0,
+      "valid, wrong queue": 67,
+      "valid, wrong priority": 81,
+      "hit generation cap": 0
+    },
+    "retrieval-only (kNN)": {
+      "unparseable JSON": 0,
+      "parsed, schema invalid": 0,
+      "valid, wrong queue": 73,
+      "valid, wrong priority": 88,
+      "hit generation cap": 0
+    }
+  },
+  "rag_config": {
+    "kb_sha256": "0c36371d5f9aafd028359878e6da878f169364c38179f7d69edeb9b4dec0c71a",
+    "n_docs": 800,
+    "chunking": "struct",
+    "retriever": "bm25",
+    "embedder": null,
+    "reranker": null,
+    "k_cand": 20,
+    "k_ctx": 3,
+    "rrf_k": 60,
+    "fixed_words": 60,
+    "fixed_stride": 40,
+    "max_doc_chars": 700,
+    "context_with_labels": true,
+    "prompt_version": "v1",
+    "retrieval_latency_ms": {
+      "p50": 0.21330080926418304,
+      "p95": 0.25058565661311144,
+      "n": 30
+    }
+  },
+  "data_sha256": {
+    "train": "1dee2cc5259a55b0ae7d5060ce344e1e61cc64e5c9883b88980f5fc696d6edff",
+    "val": "9e88d592445e38a88652c40b4a359a758c1e1f85ffb52ed2f6633bd1f2d43b27",
+    "test": "4ed79e20ab0be0de83579cc73ea406f055df6aab304d1d3dabfb76f6ccdfd837"
+  },
+  "kb_sha256": "0c36371d5f9aafd028359878e6da878f169364c38179f7d69edeb9b4dec0c71a"
+}

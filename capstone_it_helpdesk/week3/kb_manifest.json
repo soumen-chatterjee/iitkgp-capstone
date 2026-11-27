@@ -1,0 +1,14 @@
+{
+  "n_docs": 800,
+  "sha256": "0c36371d5f9aafd028359878e6da878f169364c38179f7d69edeb9b4dec0c71a",
+  "source": "Tobi-Bueck/customer-support-tickets",
+  "license": "CC BY-NC 4.0",
+  "seed": 42,
+  "leak_sim": 0.9,
+  "queues": [
+    "Technical Support",
+    "IT Support",
+    "Service Outages and Maintenance"
+  ],
+  "built_from": "unused pool of the Week 1 pipeline (disjoint from train/val/test)"
+}

@@ -1,0 +1,46 @@
+{
+  "run_id": "C",
+  "kind": "sft",
+  "config": {
+    "r": 16,
+    "alpha": 32,
+    "lr": 0.0002,
+    "targets": "qv",
+    "epochs": 3,
+    "dropout": 0.05,
+    "seed": 42,
+    "note": "ablation: q,v only"
+  },
+  "train": {
+    "trainable_params": 5046272,
+    "total_params": 7620662784,
+    "pct_trainable": 0.06621828235983522,
+    "train_sec": 672.5086805820465,
+    "final_train_loss": 0.7577824592590332,
+    "val_loss": 0.8228713274002075,
+    "peak_mem_gb": 12.418579578399658,
+    "n_train": 1500,
+    "n_dropped_long": 0
+  },
+  "test": {
+    "n": 180.0,
+    "json_parse_rate": 1.0,
+    "schema_valid_rate": 1.0,
+    "queue_acc": 0.6722222222222223,
+    "type_acc": 0.7777777777777778,
+    "priority_acc": 0.5555555555555556,
+    "labels_exact_match": 0.2722222222222222,
+    "queue_macro_f1": 0.45807872878295414,
+    "priority_macro_f1": 0.29791154791154795,
+    "rougeL_resolution": 0.30593655162835737,
+    "mean_out_tokens": 89.70555555555555,
+    "mean_prompt_len": 253.6888888888889,
+    "sec_per_example": 0.5609743865387928,
+    "tokens_per_sec": 159.91025206879422
+  },
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "smoke": false,
+  "group_by_length": false,
+  "gpu": "NVIDIA L40S",
+  "timestamp": "2026-11-26 20:09:53"
+}
