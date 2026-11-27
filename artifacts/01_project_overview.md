@@ -13,7 +13,7 @@ IT Service Management (IT Helpdesk Automation)
 
 ## Project Summary
 
-We are building a domain-adapted IT helpdesk assistant on an open 7B LLM (Qwen2.5-7B-Instruct). Given a support ticket, it returns one strict JSON object with the queue, ticket type and priority, plus a concise suggested reply. The model is fine-tuned with QLoRA on a frozen, leakage-checked dataset of synthetic support tickets and augmented with retrieval over past resolved tickets (RAG). It is then merged, 4-bit quantised and served with vLLM behind a FastAPI service with input and output guards. Every stage is compared against baselines on the same held-out test set; the final service is red-teamed with 20 adversarial prompts, and the model is documented in a model card.
+We are building a domain-adapted IT helpdesk assistant on an open 7B LLM (Qwen2.5-7B-Instruct). Given a support ticket, it returns one strict JSON object with the queue, ticket type and priority, plus a concise suggested reply. The model is fine-tuned with QLoRA on a frozen, leakage-checked dataset of synthetic support tickets and augmented with retrieval over past resolved tickets (RAG). It is then merged, 4-bit quantised and served with vLLM behind a FastAPI service with input and output guards. Every stage is compared against baselines on the same held-out test set; the final service is red-teamed with 20 adversarial prompts, and the model is documented in a model card
 
 > [!tip] Short version (for a character limit)
 > A fine-tuned, retrieval-augmented 7B open LLM that triages IT support tickets (queue, type, priority) and drafts replies as strict JSON. It is quantised, served with vLLM behind a FastAPI service with safety guards, red-teamed, and documented with a model card.
